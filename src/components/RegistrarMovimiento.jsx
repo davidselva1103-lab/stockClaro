@@ -1,13 +1,9 @@
 import React, { useState } from 'react';
 import { Plus, Minus, X, ArrowDownCircle, ArrowUpCircle, ShoppingCart, Printer, Check } from 'lucide-react';
-import { C, fmtNum } from '../lib/helpers.js';
+import { C, fmtNum, MOTIVOS } from '../lib/helpers.js';
 import { Field, inputStyle, primaryBtn, secondaryBtn, EmptyHint, Modal } from '../ui.jsx';
 import ProductPicker from './ProductPicker.jsx';
 
-const MOTIVOS = {
-  entrada: [['compra', 'Compra a proveedor'], ['devolucion', 'Devolución de cliente'], ['ajuste', 'Ajuste de inventario']],
-  salida: [['venta', 'Venta'], ['merma', 'Merma / daño'], ['ajuste', 'Ajuste de inventario']],
-};
 
 export default function RegistrarMovimiento({ type, products, canEdit, userEmail, money, onConfirm, notify }) {
   const isEntrada = type === 'entrada';

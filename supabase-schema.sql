@@ -113,11 +113,16 @@ create policy "products_write" on products for all
   using (public.current_role_is(array['admin','editor']))
   with check (public.current_role_is(array['admin','editor']));
 
--- Movimientos
+-- Movimientos: cualquiera ve el historial; admin/editor pueden registrar;
+-- solo admin puede editar o eliminar movimientos ya registrados.
 create policy "movements_select" on movements for select using (auth.role() = 'authenticated');
-create policy "movements_write" on movements for all
-  using (public.current_role_is(array['admin','editor']))
+create policy "movements_insert" on movements for insert
   with check (public.current_role_is(array['admin','editor']));
+create policy "movements_update" on movements for update
+  using (public.current_role_is(array['admin']))
+  with check (public.current_role_is(array['admin']));
+create policy "movements_delete" on movements for delete
+  using (public.current_role_is(array['admin']));
 
 -- Configuración
 create policy "config_select" on app_config for select using (auth.role() = 'authenticated');

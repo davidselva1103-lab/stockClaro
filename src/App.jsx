@@ -163,6 +163,37 @@ export default function App() {
     return true;
   }
 
+  // ---------- ADMIN: editar/eliminar historial ----------
+  async function deleteMovement(m) {
+    const p = products.find(x => x.id === m.product_id);
+    if (p) {
+      const reverted = m.type === 'entrada' ? p.stock - m.qty : p.stock + m.qty;
+      if (reverted < 0) { notify('No se puede eliminar: el stock quedaría en negativo', 'error'); return; }
+      const { error: e1 } = await supabase.from('products').update({ stock: reverted }).eq('id', p.id);
+      if (e1) { notify('No se pudo ajustar el stock: ' + e1.message, 'error'); return; }
+    }
+    const { error } = await supabase.from('movements').delete().eq('id', m.id);
+    if (error) { notify('No se pudo eliminar: ' + error.message, 'error'); return; }
+    notify('Movimiento eliminado y stock ajustado');
+    fetchProducts(); fetchMovements();
+  }
+
+  async function updateMovement(m, changes) {
+    const p = products.find(x => x.id === m.product_id);
+    if (p) {
+      const oldSigned = m.type === 'entrada' ? m.qty : -m.qty;
+      const newSigned = m.type === 'entrada' ? changes.qty : -changes.qty;
+      const newStock = p.stock - oldSigned + newSigned;
+      if (newStock < 0) { notify('Ese cambio dejaría el stock en negativo', 'error'); return; }
+      const { error: e1 } = await supabase.from('products').update({ stock: newStock }).eq('id', p.id);
+      if (e1) { notify('No se pudo ajustar el stock: ' + e1.message, 'error'); return; }
+    }
+    const { error } = await supabase.from('movements').update({ qty: changes.qty, motivo: changes.motivo, note: changes.note }).eq('id', m.id);
+    if (error) { notify('No se pudo actualizar: ' + error.message, 'error'); return; }
+    notify('Movimiento actualizado y stock ajustado');
+    fetchProducts(); fetchMovements();
+  }
+
   // ---------- CATEGORIES ----------
   async function addCategory(name) {
     name = name.trim();
@@ -299,7 +330,7 @@ export default function App() {
         {tab === 'productos' && <Productos products={products} categories={categories} canEdit={canEdit} money={money} onNew={openNewProduct} onEdit={openEditProduct} onDelete={(p) => setConfirmDelete({ id: p.id, label: p.nombre })} />}
         {tab === 'entrada' && <RegistrarMovimiento type="entrada" products={products} canEdit={canEdit} userEmail={profile.email} money={money} onConfirm={confirmCartMovement} notify={notify} />}
         {tab === 'salida' && <RegistrarMovimiento type="salida" products={products} canEdit={canEdit} userEmail={profile.email} money={money} onConfirm={confirmCartMovement} notify={notify} />}
-        {tab === 'movimientos' && <Movimientos movements={movements} />}
+        {tab === 'movimientos' && <Movimientos movements={movements} isAdmin={isAdmin} onEditMovement={updateMovement} onDeleteMovement={deleteMovement} />}
         {tab === 'reportes' && <Reportes products={products} movements={movements} money={money} />}
         {tab === 'config' && <Configuracion categories={categories} products={products} profile={profile} profiles={profiles} isAdmin={isAdmin} canEdit={canEdit} config={config}
           onAddCategory={addCategory} onDeleteCategory={deleteCategory} onChangeCurrency={changeCurrency} onChangeRole={changeRole}

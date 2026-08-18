@@ -49,3 +49,7 @@ export function matchesSearch(p, q) {
   const s = q.toLowerCase();
   return (p.nombre || '').toLowerCase().includes(s) || (p.sku || '').toLowerCase().includes(s) || (p.descripcion || '').toLowerCase().includes(s);
 }
+export const MOTIVOS = {
+  entrada: [['compra', 'Compra a proveedor'], ['devolucion', 'Devolución de cliente'], ['ajuste', 'Ajuste de inventario']],
+  salida: [['venta', 'Venta'], ['merma', 'Merma / daño'], ['ajuste', 'Ajuste de inventario']],
+};
