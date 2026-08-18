@@ -44,6 +44,7 @@ create table if not exists products (
   id uuid primary key default gen_random_uuid(),
   sku text,
   nombre text not null,
+  descripcion text,
   categoria text,
   costo numeric default 0,
   precio_venta numeric default 0,

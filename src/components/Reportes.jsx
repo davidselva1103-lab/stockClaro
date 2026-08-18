@@ -1,8 +1,26 @@
-import React, { useMemo } from 'react';
-import { C, fmtNum } from '../lib/helpers.js';
+import React, { useMemo, useState } from 'react';
+import { C, fmtNum, PERIODS, startOfPeriod } from '../lib/helpers.js';
 import { EmptyHint } from '../ui.jsx';
 
+function PeriodStat({ label, value, color }) {
+  return (
+    <div style={{ background: '#FAFCFB', border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+      <div style={{ fontSize: 11.5, color: C.inkSoft }}>{label}</div>
+      <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: color || C.ink }}>{value}</div>
+    </div>
+  );
+}
+
 export default function Reportes({ products, movements, money }) {
+  const [period, setPeriod] = useState('dia');
+  const periodStats = useMemo(() => {
+    const start = startOfPeriod(period);
+    const ventas = movements.filter(m => m.type === 'salida' && m.motivo === 'venta' && new Date(m.date) >= start);
+    const utilidad = ventas.reduce((s, m) => s + (m.venta_unit - m.costo_unit) * m.qty, 0);
+    const unidades = ventas.reduce((s, m) => s + m.qty, 0);
+    const ingresos = ventas.reduce((s, m) => s + m.venta_unit * m.qty, 0);
+    return { utilidad, unidades, ingresos };
+  }, [movements, period]);
   const totals = useMemo(() => {
     const valorCosto = products.reduce((s, p) => s + p.costo * p.stock, 0);
     const valorVenta = products.reduce((s, p) => s + p.precio_venta * p.stock, 0);
@@ -23,6 +41,26 @@ export default function Reportes({ products, movements, money }) {
 
   return (
     <div>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 13, padding: 16, marginBottom: 16 }}>
+        <div className="flex items-center justify-between" style={{ flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 14.5 }}>Utilidad por período</div>
+          <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+            {PERIODS.map(p => (
+              <button key={p.key} onClick={() => setPeriod(p.key)} style={{
+                padding: '6px 12px', borderRadius: 8, border: `1px solid ${period === p.key ? C.brand : C.border}`,
+                background: period === p.key ? C.brandSoft : '#fff', color: period === p.key ? C.brandDark : C.inkSoft,
+                fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+              }}>{p.label}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12 }}>
+          <PeriodStat label="Unidades vendidas" value={fmtNum(periodStats.unidades)} />
+          <PeriodStat label="Ingresos" value={money(periodStats.ingresos)} />
+          <PeriodStat label="Utilidad generada" value={money(periodStats.utilidad)} color={C.ok} />
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 12, marginBottom: 18 }}>
         {[['Valor a costo', totals.valorCosto], ['Valor a venta', totals.valorVenta], ['Utilidad potencial', totals.utilidadPotencial], ['Utilidad realizada', totals.utilidadRealizada]].map(([label, val], i) => (
           <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 13, padding: 16 }}>

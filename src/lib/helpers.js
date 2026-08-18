@@ -26,3 +26,26 @@ export const STATUS_META = {
 };
 export function fmtNum(n) { return (Number(n) || 0).toLocaleString('es-NI', { maximumFractionDigits: 2 }); }
 export function fmtDate(d) { return new Date(d).toLocaleString('es-NI', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+
+export const PERIODS = [
+  { key: 'dia', label: 'Hoy' },
+  { key: 'semana', label: 'Esta semana' },
+  { key: 'mes', label: 'Este mes' },
+  { key: 'anio', label: 'Este año' },
+];
+export function startOfPeriod(key) {
+  const d = new Date();
+  if (key === 'dia') { d.setHours(0, 0, 0, 0); return d; }
+  if (key === 'semana') {
+    const day = (d.getDay() + 6) % 7; // lunes = 0
+    d.setDate(d.getDate() - day); d.setHours(0, 0, 0, 0); return d;
+  }
+  if (key === 'mes') { d.setDate(1); d.setHours(0, 0, 0, 0); return d; }
+  if (key === 'anio') { d.setMonth(0, 1); d.setHours(0, 0, 0, 0); return d; }
+  return d;
+}
+export function matchesSearch(p, q) {
+  if (!q) return true;
+  const s = q.toLowerCase();
+  return (p.nombre || '').toLowerCase().includes(s) || (p.sku || '').toLowerCase().includes(s) || (p.descripcion || '').toLowerCase().includes(s);
+}

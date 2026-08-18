@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import {
   Boxes, Download, LayoutDashboard, Package, ShoppingCart, BarChart3,
-  Settings as SettingsIcon, Loader2
+  Settings as SettingsIcon, Loader2, ArrowDownCircle, ArrowUpCircle
 } from 'lucide-react';
 import { supabase } from './supabaseClient.js';
 import { C, CAT_PALETTE, fmtNum } from './lib/helpers.js';
@@ -12,6 +12,7 @@ import Dashboard from './components/Dashboard.jsx';
 import Productos from './components/Productos.jsx';
 import ProductModal from './components/ProductModal.jsx';
 import Movimientos from './components/Movimientos.jsx';
+import RegistrarMovimiento from './components/RegistrarMovimiento.jsx';
 import Reportes from './components/Reportes.jsx';
 import Configuracion from './components/Configuracion.jsx';
 import ImportModal from './components/ImportModal.jsx';
@@ -99,7 +100,7 @@ export default function App() {
   const isAdmin = profile && profile.role === 'admin';
 
   // ---------- PRODUCT CRUD ----------
-  function openNewProduct() { setProductModal({ mode: 'new', data: { sku: '', nombre: '', categoria: categories[0]?.name || 'General', costo: '', precio_venta: '', stock: '0', stock_minimo: '5', unidad: 'unidad' } }); }
+  function openNewProduct() { setProductModal({ mode: 'new', data: { sku: '', nombre: '', descripcion: '', categoria: categories[0]?.name || 'General', costo: '', precio_venta: '', stock: '0', stock_minimo: '5', unidad: 'unidad' } }); }
   function openEditProduct(p) { setProductModal({ mode: 'edit', data: { ...p, costo: String(p.costo), precio_venta: String(p.precio_venta), stock_minimo: String(p.stock_minimo) } }); }
 
   async function saveProduct(data) {
@@ -111,7 +112,7 @@ export default function App() {
     if (productModal.mode === 'new') {
       const stockInicial = parseFloat(data.stock) || 0;
       const { data: inserted, error } = await supabase.from('products').insert({
-        sku: data.sku.trim() || null, nombre: data.nombre.trim(), categoria: data.categoria,
+        sku: data.sku.trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria,
         costo, precio_venta, stock: stockInicial, stock_minimo, unidad: data.unidad,
       }).select().single();
       if (error) { notify('No se pudo guardar: ' + error.message, 'error'); return; }
@@ -125,7 +126,7 @@ export default function App() {
       notify('Producto agregado');
     } else {
       const { error } = await supabase.from('products').update({
-        sku: data.sku.trim() || null, nombre: data.nombre.trim(), categoria: data.categoria, costo, precio_venta, stock_minimo, unidad: data.unidad,
+        sku: data.sku.trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria, costo, precio_venta, stock_minimo, unidad: data.unidad,
       }).eq('id', data.id);
       if (error) { notify('No se pudo actualizar: ' + error.message, 'error'); return; }
       notify('Producto actualizado');
@@ -141,24 +142,25 @@ export default function App() {
     fetchProducts();
   }
 
-  // ---------- MOVEMENTS ----------
-  async function registerMovement({ productId, type, motivo, qty, note }) {
-    const p = products.find(x => x.id === productId);
-    if (!p) return;
-    const q = parseFloat(qty) || 0;
-    if (q <= 0) { notify('La cantidad debe ser mayor a cero', 'error'); return; }
-    if (type === 'salida' && q > p.stock) { notify(`Solo hay ${fmtNum(p.stock)} ${p.unidad} disponibles`, 'error'); return; }
-    const newStock = type === 'entrada' ? p.stock + q : p.stock - q;
-
-    const { error: e1 } = await supabase.from('products').update({ stock: newStock }).eq('id', productId);
-    if (e1) { notify('No se pudo actualizar el stock: ' + e1.message, 'error'); return; }
-    const { error: e2 } = await supabase.from('movements').insert({
-      product_id: productId, sku: p.sku, product_name: p.nombre, type, motivo, qty: q,
-      costo_unit: p.costo, venta_unit: p.precio_venta, note: note || '', created_by: session.user.id,
-    });
-    if (e2) { notify('No se pudo registrar el movimiento: ' + e2.message, 'error'); return; }
+  // ---------- MOVEMENTS (carrito por lote) ----------
+  async function confirmCartMovement({ items, type, motivo, note }) {
+    for (const it of items) {
+      const p = products.find(x => x.id === it.productId);
+      if (!p) continue;
+      const q = parseFloat(it.qty) || 0;
+      if (q <= 0) continue;
+      const newStock = type === 'entrada' ? p.stock + q : Math.max(0, p.stock - q);
+      const { error: e1 } = await supabase.from('products').update({ stock: newStock }).eq('id', it.productId);
+      if (e1) { notify('No se pudo actualizar "' + p.nombre + '": ' + e1.message, 'error'); return false; }
+      const { error: e2 } = await supabase.from('movements').insert({
+        product_id: it.productId, sku: p.sku, product_name: p.nombre, type, motivo, qty: q,
+        costo_unit: p.costo, venta_unit: p.precio_venta, note: note || '', created_by: session.user.id,
+      });
+      if (e2) { notify('No se pudo registrar el movimiento de "' + p.nombre + '": ' + e2.message, 'error'); return false; }
+    }
     notify(type === 'entrada' ? 'Entrada registrada' : 'Salida registrada');
     fetchProducts(); fetchMovements();
+    return true;
   }
 
   // ---------- CATEGORIES ----------
@@ -278,7 +280,14 @@ export default function App() {
       </div>
 
       <div style={{ display: 'flex', gap: 4, padding: '10px 16px', background: C.surface, borderBottom: `1px solid ${C.border}`, overflowX: 'auto' }}>
-        {[['dashboard', 'Dashboard', LayoutDashboard], ['productos', 'Productos', Package], ['movimientos', 'Movimientos', ShoppingCart], ['reportes', 'Utilidad', BarChart3], ['config', 'Configuración', SettingsIcon]].map(([key, label, Icon]) => (
+        {[
+          ['dashboard', 'Dashboard', LayoutDashboard],
+          ['productos', 'Productos', Package],
+          ...(canEdit ? [['entrada', 'Entrada', ArrowDownCircle], ['salida', 'Salida', ArrowUpCircle]] : []),
+          ['movimientos', 'Movimientos', ShoppingCart],
+          ['reportes', 'Utilidad', BarChart3],
+          ['config', 'Configuración', SettingsIcon],
+        ].map(([key, label, Icon]) => (
           <button key={key} onClick={() => setTab(key)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', background: tab === key ? C.brandSoft : 'transparent', color: tab === key ? C.brandDark : C.inkSoft }}>
             <Icon size={15} /> {label}
           </button>
@@ -288,7 +297,9 @@ export default function App() {
       <div style={{ padding: 20, maxWidth: 1200, margin: '0 auto' }}>
         {tab === 'dashboard' && <Dashboard products={products} movements={movements} categories={categories} money={money} setTab={setTab} />}
         {tab === 'productos' && <Productos products={products} categories={categories} canEdit={canEdit} money={money} onNew={openNewProduct} onEdit={openEditProduct} onDelete={(p) => setConfirmDelete({ id: p.id, label: p.nombre })} />}
-        {tab === 'movimientos' && <Movimientos products={products} movements={movements} canEdit={canEdit} onRegister={registerMovement} />}
+        {tab === 'entrada' && <RegistrarMovimiento type="entrada" products={products} canEdit={canEdit} userEmail={profile.email} money={money} onConfirm={confirmCartMovement} notify={notify} />}
+        {tab === 'salida' && <RegistrarMovimiento type="salida" products={products} canEdit={canEdit} userEmail={profile.email} money={money} onConfirm={confirmCartMovement} notify={notify} />}
+        {tab === 'movimientos' && <Movimientos movements={movements} />}
         {tab === 'reportes' && <Reportes products={products} movements={movements} money={money} />}
         {tab === 'config' && <Configuracion categories={categories} products={products} profile={profile} profiles={profiles} isAdmin={isAdmin} canEdit={canEdit} config={config}
           onAddCategory={addCategory} onDeleteCategory={deleteCategory} onChangeCurrency={changeCurrency} onChangeRole={changeRole}

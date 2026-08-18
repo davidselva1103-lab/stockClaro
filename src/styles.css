@@ -20,5 +20,10 @@ tr:hover td { background: #FAFCFB; }
 .gap-2 { gap: 8px; }
 .gap-3 { gap: 12px; }
 @media (max-width: 760px) {
-  .dash-grid, .mov-grid, .cfg-grid { grid-template-columns: 1fr !important; }
+  .dash-grid, .mov-grid, .cfg-grid, .cart-grid { grid-template-columns: 1fr !important; }
+}
+@media print {
+  body * { visibility: hidden; }
+  #receipt-print, #receipt-print * { visibility: visible; }
+  #receipt-print { position: absolute; left: 0; top: 0; width: 100%; }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2 } from 'lucide-react';
-import { C, STATUS_META, stockStatus, colorForCategory, fmtNum, PAGE_SIZE } from '../lib/helpers.js';
+import { C, STATUS_META, stockStatus, colorForCategory, fmtNum, PAGE_SIZE, matchesSearch } from '../lib/helpers.js';
 import { Badge, StockGauge, EmptyHint, Pager, inputStyle, primaryBtn, iconBtn } from '../ui.jsx';
 
 export default function Productos({ products, categories, canEdit, money, onNew, onEdit, onDelete }) {
@@ -10,7 +10,7 @@ export default function Productos({ products, categories, canEdit, money, onNew,
   const [page, setPage] = useState(0);
 
   const filtered = useMemo(() => products.filter(p => {
-    if (q && !(p.nombre.toLowerCase().includes(q.toLowerCase()) || (p.sku || '').toLowerCase().includes(q.toLowerCase()))) return false;
+    if (!matchesSearch(p, q)) return false;
     if (catFilter !== 'todas' && p.categoria !== catFilter) return false;
     if (statusFilter !== 'todos' && stockStatus(p) !== statusFilter) return false;
     return true;
@@ -57,7 +57,10 @@ export default function Productos({ products, categories, canEdit, money, onNew,
                 return (
                   <tr key={p.id}>
                     <td style={{ fontFamily: 'IBM Plex Mono, monospace', color: C.inkSoft }}>{p.sku}</td>
-                    <td style={{ fontWeight: 600 }}>{p.nombre}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{p.nombre}</div>
+                      {p.descripcion && <div style={{ fontSize: 11.5, color: C.inkSoft, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.descripcion}</div>}
+                    </td>
                     <td><Badge color="#fff" bg={colorForCategory(p.categoria, categories)}>{p.categoria}</Badge></td>
                     <td>{money(p.costo)}</td>
                     <td>{money(p.precio_venta)}</td>

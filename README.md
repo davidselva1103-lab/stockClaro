@@ -58,10 +58,16 @@ Si esto funciona, ¡ya tienes tu sistema corriendo! El siguiente paso es publica
 1. Sube esta carpeta a un repositorio de **GitHub** (crea una cuenta gratis en github.com si no tienes, crea un repositorio nuevo y sube estos archivos — puedes arrastrar y soltar los archivos desde la página de GitHub si no usas comandos de git).
 2. Ve a **https://vercel.com**, crea una cuenta gratuita (puedes entrar directo con tu cuenta de GitHub).
 3. Clic en **"Add New Project"** y elige el repositorio que acabas de subir.
-4. Antes de darle a "Deploy", abre la sección **"Environment Variables"** y agrega las mismas dos variables de tu archivo `.env`:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
+4. Antes de darle a "Deploy", busca la sección **"Environment Variables"** (a veces aparece colapsada/cerrada — haz clic sobre el título para que se abra). Vas a ver dos casillas de texto: una dice **"Key"** (o "Name") y otra **"Value"**. Llénalas así, una fila a la vez, dando clic en **"Add"** después de cada una:
+   - Key: `VITE_SUPABASE_URL` → Value: tu URL de Supabase (ej. `https://xxxxx.supabase.co`)
+   - Key: `VITE_SUPABASE_ANON_KEY` → Value: tu clave anon completa
 5. Clic en **Deploy**. En 1-2 minutos tendrás tu propia dirección web (algo como `stockclaro.vercel.app`) que puedes compartir con tu equipo.
+
+   **¿No encuentras "Environment Variables" o ya le diste Deploy sin agregarlas?** No hay problema, se agregan después:
+   1. Entra a tu proyecto dentro de Vercel → pestaña **"Settings"**.
+   2. En el menú de la izquierda, clic en **"Environment Variables"**.
+   3. Agrega ahí las dos variables (Name y Value), una por una, y guarda con **"Save"**.
+   4. Ve a la pestaña **"Deployments"**, clic en los tres puntos `⋯` del último deploy y elige **"Redeploy"** para que tome los cambios.
 
 Cada vez que quieras actualizar el sistema, subes los cambios a GitHub y Vercel lo vuelve a publicar automáticamente.
 
