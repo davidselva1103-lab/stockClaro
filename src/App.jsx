@@ -101,7 +101,7 @@ export default function App() {
 
   // ---------- PRODUCT CRUD ----------
   function openNewProduct() { setProductModal({ mode: 'new', data: { sku: '', nombre: '', descripcion: '', categoria: categories[0]?.name || 'General', costo: '', precio_venta: '', stock: '0', stock_minimo: '5', unidad: 'unidad', presentaciones: [] } }); }
-  function openEditProduct(p) { setProductModal({ mode: 'edit', data: { ...p, costo: String(p.costo), precio_venta: String(p.precio_venta), stock_minimo: String(p.stock_minimo), presentaciones: (p.presentaciones || []).map(pr => ({ ...pr, cantidad: String(pr.cantidad), precio: String(pr.precio) })) } }); }
+  function openEditProduct(p) { setProductModal({ mode: 'edit', data: { ...p, costo: String(p.costo), precio_venta: String(p.precio_venta), stock_minimo: String(p.stock_minimo), presentaciones: (p.presentaciones || []).map(pr => ({ ...pr, cantidad: String(pr.cantidad), precio: String(pr.precio), precioAuto: false })) } }); }
 
   async function saveProduct(data) {
     if (!data.nombre.trim()) { notify('El nombre es obligatorio', 'error'); return; }
@@ -155,7 +155,7 @@ export default function App() {
       const newStock = type === 'entrada' ? p.stock + q : Math.max(0, p.stock - q);
       const { error: e1 } = await supabase.from('products').update({ stock: newStock }).eq('id', it.productId);
       if (e1) { notify('No se pudo actualizar "' + p.nombre + '": ' + e1.message, 'error'); return false; }
-      const ventaUnitEfectivo = it.presentacion ? (it.presentacionPrecio / it.presentacionUnidades) : p.precio_venta;
+      const ventaUnitEfectivo = it.ventaUnitEfectivo != null ? it.ventaUnitEfectivo : (it.presentacion ? (it.presentacionPrecio / it.presentacionUnidades) : p.precio_venta);
       const { error: e2 } = await supabase.from('movements').insert({
         product_id: it.productId, sku: p.sku, product_name: p.nombre, type, motivo, qty: q,
         costo_unit: p.costo, venta_unit: ventaUnitEfectivo, note: note || '', created_by: session.user.id,

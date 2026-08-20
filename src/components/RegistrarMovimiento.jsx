@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Minus, X, ArrowDownCircle, ArrowUpCircle, ShoppingCart, Printer, Check } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Plus, Minus, X, ArrowDownCircle, ArrowUpCircle, ShoppingCart, Printer, Check, AlertTriangle } from 'lucide-react';
 import { C, fmtNum, MOTIVOS } from '../lib/helpers.js';
 import { Field, inputStyle, primaryBtn, secondaryBtn, EmptyHint, Modal } from '../ui.jsx';
 import ProductPicker from './ProductPicker.jsx';
@@ -7,42 +7,61 @@ import ProductPicker from './ProductPicker.jsx';
 export default function RegistrarMovimiento({ type, products, canEdit, userEmail, money, onConfirm, notify }) {
   const isEntrada = type === 'entrada';
   const [cart, setCart] = useState([]); // {lineId, productId, nombre, unidad, presentacion, presentacionUnidades, unitPrice, qty, stock}
-  const [pending, setPending] = useState(null); // {product, presKey, qty}
+  const [pending, setPending] = useState(null); // {product, presKey, qty, customPrice}
   const [motivo, setMotivo] = useState(MOTIVOS[type][0][0]);
   const [note, setNote] = useState('');
   const [receipt, setReceipt] = useState(null);
   const [confirming, setConfirming] = useState(false);
+  const isVentaEspecial = !isEntrada && motivo === 'venta_especial';
 
-  // Opciones de presentación disponibles para el producto elegido (solo aplica a salidas/ventas)
+  // stock ya comprometido en el carrito para un producto (en unidades base), para no sobre-vender antes de confirmar
+  function stockRestante(productId, stockReal) {
+    const yaEnCarrito = cart.filter(i => i.productId === productId).reduce((s, i) => s + i.qty * i.presentacionUnidades, 0);
+    return Math.max(0, stockReal - yaEnCarrito);
+  }
+
+  // Opciones de presentación disponibles para el producto elegido, con disponibilidad real calculada
   function presentacionesDe(product) {
-    const base = { key: 'unidad', nombre: null, cantidad: 1, precio: isEntrada ? product.costo : product.precio_venta, label: `Unidad (${money(isEntrada ? product.costo : product.precio_venta)})` };
+    const restante = stockRestante(product.id, product.stock);
+    const base = { key: 'unidad', nombre: null, cantidad: 1, precio: isEntrada ? product.costo : product.precio_venta, disponible: isEntrada ? Infinity : restante };
     if (isEntrada) return [base];
     const extra = (product.presentaciones || []).filter(p => p.cantidad > 0).map(p => ({
-      key: p.id, nombre: p.nombre, cantidad: p.cantidad, precio: p.precio, label: `${p.nombre} de ${fmtNum(p.cantidad)} (${money(p.precio)})`,
+      key: p.id, nombre: p.nombre, cantidad: p.cantidad, precio: p.precio, disponible: Math.floor(restante / p.cantidad),
     }));
     return [base, ...extra];
   }
 
   function selectProduct(p) {
-    setPending({ product: p, presKey: 'unidad', qty: 1 });
+    setPending({ product: p, presKey: 'unidad', qty: 1, customPrice: null });
   }
   const pendingOptions = pending ? presentacionesDe(pending.product) : [];
-  const pendingPres = pending ? pendingOptions.find(o => o.key === pending.presKey) || pendingOptions[0] : null;
+  const pendingPres = pending ? (pendingOptions.find(o => o.key === pending.presKey) || pendingOptions[0]) : null;
+  const pendingEffectivePrice = pending && pendingPres ? (isVentaEspecial && pending.customPrice !== null ? (parseFloat(pending.customPrice) || 0) : pendingPres.precio) : 0;
+
+  // si cambia la presentación elegida, reiniciar el precio especial al sugerido de esa presentación
+  useEffect(() => { if (pending) setPending(pd => pd ? { ...pd, customPrice: null } : pd); }, [pending?.presKey]);
 
   function changePendingQty(delta) {
-    setPending(pd => pd ? { ...pd, qty: Math.max(1, pd.qty + delta) } : pd);
+    setPending(pd => {
+      if (!pd) return pd;
+      const max = pendingPres ? pendingPres.disponible : Infinity;
+      return { ...pd, qty: Math.max(1, Math.min(max === Infinity ? Infinity : Math.max(max, pd.qty), pd.qty + delta)) };
+    });
   }
   function addPendingToCart() {
     if (!pending || !pendingPres) return;
+    if (!isEntrada && pendingPres.disponible < 1) { notify('No hay stock suficiente para vender por ' + (pendingPres.nombre || 'unidad'), 'error'); return; }
+    if (!isEntrada && pending.qty > pendingPres.disponible) { notify(`Solo alcanza para ${fmtNum(pendingPres.disponible)} ${pendingPres.nombre || pending.product.unidad}`, 'error'); return; }
     const p = pending.product;
-    const lineId = p.id + '-' + pendingPres.key;
+    const lineId = p.id + '-' + pendingPres.key + (isVentaEspecial ? '-esp-' + Date.now() : '');
+    const unitPrice = pendingEffectivePrice;
     setCart(c => {
-      const existing = c.find(i => i.lineId === lineId);
+      const existing = !isVentaEspecial && c.find(i => i.lineId === lineId);
       if (existing) return c.map(i => i.lineId === lineId ? { ...i, qty: i.qty + pending.qty } : i);
       return [...c, {
         lineId, productId: p.id, nombre: p.nombre, unidad: p.unidad, stock: p.stock,
         presentacion: pendingPres.nombre, presentacionUnidades: pendingPres.cantidad,
-        unitPrice: pendingPres.precio, qty: pending.qty,
+        unitPrice, qty: pending.qty,
       }];
     });
     setPending(null);
@@ -55,7 +74,6 @@ export default function RegistrarMovimiento({ type, products, canEdit, userEmail
   const totalUnidadesPresentacion = cart.reduce((s, i) => s + i.qty, 0);
   const total = cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
 
-  // Unidades base (para descontar del stock) agrupadas por producto, para validar disponibilidad
   const baseUnitsByProduct = useMemo(() => {
     const map = {};
     cart.forEach(i => { map[i.productId] = (map[i.productId] || 0) + i.qty * i.presentacionUnidades; });
@@ -74,6 +92,7 @@ export default function RegistrarMovimiento({ type, products, canEdit, userEmail
     const items = cart.map(i => ({
       productId: i.productId, baseQty: i.qty * i.presentacionUnidades,
       presentacion: i.presentacion, presentacionUnidades: i.presentacionUnidades, presentacionPrecio: i.unitPrice,
+      ventaUnitEfectivo: i.unitPrice / i.presentacionUnidades,
     }));
     const ok = await onConfirm({ items, type, motivo, note });
     setConfirming(false);
@@ -96,31 +115,60 @@ export default function RegistrarMovimiento({ type, products, canEdit, userEmail
           {isEntrada ? <ArrowDownCircle size={18} color={C.ok} /> : <ArrowUpCircle size={18} color={C.danger} />}
           {isEntrada ? 'Registrar entrada' : 'Registrar salida'}
         </div>
+
+        {!isEntrada && (
+          <div style={{ marginBottom: 12 }}>
+            <Field label="Motivo (aplica a todo lo que agregues al carrito)">
+              <select style={inputStyle} value={motivo} onChange={e => setMotivo(e.target.value)}>
+                {MOTIVOS.salida.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </Field>
+            {isVentaEspecial && (
+              <div style={{ fontSize: 12, color: C.warn, background: C.warnBg, padding: '6px 10px', borderRadius: 8, marginTop: -6 }}>
+                Modo venta especial: puedes escribir el precio a mano para cada producto que agregues.
+              </div>
+            )}
+          </div>
+        )}
+
         <ProductPicker products={products} onAdd={selectProduct} />
 
         {pending && pendingPres && (
           <div style={{ marginTop: 12, background: C.brandSoft, border: `1px solid ${C.brand}`, borderRadius: 10, padding: 14 }}>
             <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 2 }}>{pending.product.nombre}</div>
-            <div style={{ fontSize: 11.5, color: C.inkSoft, marginBottom: 10 }}>{fmtNum(pending.product.stock)} {pending.product.unidad} disponibles</div>
+            <div style={{ fontSize: 11.5, color: C.inkSoft, marginBottom: 10 }}>{fmtNum(pending.product.stock)} {pending.product.unidad} en stock</div>
 
             {pendingOptions.length > 1 && (
               <div className="flex gap-2" style={{ flexWrap: 'wrap', marginBottom: 10 }}>
-                {pendingOptions.map(o => (
-                  <button key={o.key} onClick={() => setPending(pd => ({ ...pd, presKey: o.key }))} style={{
-                    padding: '6px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    border: `1px solid ${pending.presKey === o.key ? C.brand : C.border}`,
-                    background: pending.presKey === o.key ? '#fff' : 'transparent',
-                    color: pending.presKey === o.key ? C.brandDark : C.inkSoft,
-                  }}>{o.label}</button>
-                ))}
+                {pendingOptions.map(o => {
+                  const sinStock = !isEntrada && o.disponible < 1;
+                  return (
+                    <button key={o.key} disabled={sinStock} onClick={() => setPending(pd => ({ ...pd, presKey: o.key, qty: 1 }))} style={{
+                      padding: '6px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: sinStock ? 'not-allowed' : 'pointer',
+                      border: `1px solid ${sinStock ? C.danger : pending.presKey === o.key ? C.brand : C.border}`,
+                      background: sinStock ? C.dangerBg : pending.presKey === o.key ? '#fff' : 'transparent',
+                      color: sinStock ? C.danger : pending.presKey === o.key ? C.brandDark : C.inkSoft,
+                      opacity: sinStock ? 0.85 : 1,
+                    }}>
+                      {o.nombre || 'Unidad'} ({money(o.precio)}){!isEntrada ? ` · ${sinStock ? 'sin stock' : `quedan ${fmtNum(o.disponible)}`}` : ''}
+                    </button>
+                  );
+                })}
               </div>
+            )}
+
+            {isVentaEspecial && (
+              <Field label="Precio especial para esta venta">
+                <input type="number" step="0.01" style={inputStyle} placeholder={String(pendingPres.precio)}
+                  value={pending.customPrice ?? ''} onChange={e => setPending(pd => ({ ...pd, customPrice: e.target.value }))} />
+              </Field>
             )}
 
             <div className="flex items-center justify-between" style={{ flexWrap: 'wrap', gap: 10 }}>
               <div className="flex items-center gap-2">
                 <button onClick={() => changePendingQty(-1)} style={stepBtnLg}><Minus size={15} /></button>
                 <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontWeight: 700, fontSize: 16, minWidth: 34, textAlign: 'center' }}>{fmtNum(pending.qty)}</span>
-                <button onClick={() => changePendingQty(1)} style={stepBtnLg}><Plus size={15} /></button>
+                <button onClick={() => changePendingQty(1)} disabled={!isEntrada && pending.qty >= pendingPres.disponible} style={{ ...stepBtnLg, opacity: (!isEntrada && pending.qty >= pendingPres.disponible) ? 0.4 : 1 }}><Plus size={15} /></button>
                 <span style={{ fontSize: 12.5, color: C.inkSoft, marginLeft: 4 }}>{pendingPres.nombre || pending.product.unidad}{pendingPres.cantidad > 1 ? ` (${fmtNum(pendingPres.cantidad)} c/u)` : ''}</span>
               </div>
               <div className="flex items-center gap-2">
@@ -128,6 +176,11 @@ export default function RegistrarMovimiento({ type, products, canEdit, userEmail
                 <button onClick={addPendingToCart} style={{ ...primaryBtn, background: isEntrada ? C.brand : C.danger }}><ShoppingCart size={15} /> Añadir al carrito</button>
               </div>
             </div>
+            {!isEntrada && pendingPres.disponible < 1 && (
+              <div className="flex items-center gap-2" style={{ marginTop: 8, color: C.danger, fontSize: 12 }}>
+                <AlertTriangle size={13} /> No queda stock suficiente para vender por {pendingPres.nombre || 'unidad'}.
+              </div>
+            )}
           </div>
         )}
 
@@ -161,11 +214,13 @@ export default function RegistrarMovimiento({ type, products, canEdit, userEmail
           </div>
           <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: C.brandDark, marginTop: 4 }}>{money(total)}</div>
         </div>
-        <Field label="Motivo">
-          <select style={inputStyle} value={motivo} onChange={e => setMotivo(e.target.value)}>
-            {MOTIVOS[type].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </Field>
+        {isEntrada && (
+          <Field label="Motivo">
+            <select style={inputStyle} value={motivo} onChange={e => setMotivo(e.target.value)}>
+              {MOTIVOS.entrada.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="Nota (opcional)"><input style={inputStyle} value={note} onChange={e => setNote(e.target.value)} placeholder="Ej. Cliente, factura #234" /></Field>
         <button onClick={confirm} disabled={cart.length === 0 || confirming} style={{ ...primaryBtn, width: '100%', justifyContent: 'center', opacity: (cart.length === 0 || confirming) ? .5 : 1, background: isEntrada ? C.brand : C.danger }}>
           <Check size={15} /> {confirming ? 'Guardando…' : isEntrada ? 'Confirmar entrada' : 'Confirmar venta / salida'}

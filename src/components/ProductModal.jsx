@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Check, Plus, X } from 'lucide-react';
-import { UNIDADES } from '../lib/helpers.js';
+import { UNIDADES, fmtNum } from '../lib/helpers.js';
 import { Modal, Field, inputStyle, primaryBtn, secondaryBtn, iconBtn } from '../ui.jsx';
 
 function localId() { return 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7); }
@@ -14,10 +14,28 @@ export default function ProductModal({ state, categories, onClose, onSave, onAdd
   const margin = ventaNum ? (((ventaNum - costoNum) / ventaNum) * 100).toFixed(1) : null;
 
   function addPresentacion(nombre) {
-    set('presentaciones', [...data.presentaciones, { id: localId(), nombre, cantidad: nombre === 'Docena' ? '12' : '', precio: '' }]);
+    const cantidadInicial = nombre === 'Docena' ? 12 : '';
+    const precioSugerido = cantidadInicial ? (cantidadInicial * ventaNum).toFixed(2) : '';
+    set('presentaciones', [...data.presentaciones, { id: localId(), nombre, cantidad: cantidadInicial ? String(cantidadInicial) : '', precio: precioSugerido, precioAuto: true }]);
   }
   function updatePresentacion(id, field, value) {
-    set('presentaciones', data.presentaciones.map(p => p.id === id ? { ...p, [field]: value } : p));
+    set('presentaciones', data.presentaciones.map(p => {
+      if (p.id !== id) return p;
+      if (field === 'precio') return { ...p, precio: value, precioAuto: false };
+      if (field === 'cantidad') {
+        const cant = parseFloat(value) || 0;
+        const precio = p.precioAuto ? (cant ? (cant * ventaNum).toFixed(2) : '') : p.precio;
+        return { ...p, cantidad: value, precio };
+      }
+      return { ...p, [field]: value };
+    }));
+  }
+  function recalcularPrecio(id) {
+    set('presentaciones', data.presentaciones.map(p => {
+      if (p.id !== id) return p;
+      const cant = parseFloat(p.cantidad) || 0;
+      return { ...p, precio: cant ? (cant * ventaNum).toFixed(2) : '', precioAuto: true };
+    }));
   }
   function removePresentacion(id) {
     set('presentaciones', data.presentaciones.filter(p => p.id !== id));
@@ -56,14 +74,27 @@ export default function ProductModal({ state, categories, onClose, onSave, onAdd
 
       <Field label="Otras formas de venta (opcional)">
         <div style={{ fontSize: 12, color: '#5C6B67', marginBottom: 8 }}>Además de vender por unidad (precio de arriba), puedes agregar precios para vender por caja, docena, etc.</div>
-        {data.presentaciones.map(p => (
-          <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 0.9fr auto', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-            <input style={{ ...inputStyle, fontSize: 12.5 }} placeholder="Nombre (ej. Caja)" value={p.nombre} onChange={e => updatePresentacion(p.id, 'nombre', e.target.value)} />
-            <input type="number" style={{ ...inputStyle, fontSize: 12.5 }} placeholder="Unidades" value={p.cantidad} onChange={e => updatePresentacion(p.id, 'cantidad', e.target.value)} />
-            <input type="number" step="0.01" style={{ ...inputStyle, fontSize: 12.5 }} placeholder="Precio" value={p.precio} onChange={e => updatePresentacion(p.id, 'precio', e.target.value)} />
-            <button type="button" onClick={() => removePresentacion(p.id)} style={{ ...iconBtn, color: '#C24141' }}><X size={14} /></button>
-          </div>
-        ))}
+        {data.presentaciones.map(p => {
+          const cant = parseFloat(p.cantidad) || 0;
+          const precioNum = parseFloat(p.precio) || 0;
+          const efectivo = cant > 0 && precioNum > 0 ? precioNum / cant : null;
+          return (
+            <div key={p.id} style={{ marginBottom: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 0.9fr auto auto', gap: 6, alignItems: 'center' }}>
+                <input style={{ ...inputStyle, fontSize: 12.5 }} placeholder="Nombre (ej. Caja)" value={p.nombre} onChange={e => updatePresentacion(p.id, 'nombre', e.target.value)} />
+                <input type="number" style={{ ...inputStyle, fontSize: 12.5 }} placeholder="Unidades" value={p.cantidad} onChange={e => updatePresentacion(p.id, 'cantidad', e.target.value)} />
+                <input type="number" step="0.01" style={{ ...inputStyle, fontSize: 12.5 }} placeholder="Precio (auto)" value={p.precio} onChange={e => updatePresentacion(p.id, 'precio', e.target.value)} />
+                <button type="button" title="Recalcular precio automático" onClick={() => recalcularPrecio(p.id)} style={{ ...iconBtn, border: '1px solid #DEE6E2' }}>↺</button>
+                <button type="button" onClick={() => removePresentacion(p.id)} style={{ ...iconBtn, color: '#C24141' }}><X size={14} /></button>
+              </div>
+              {efectivo !== null && (
+                <div style={{ fontSize: 11, color: '#5C6B67', marginTop: 2, marginLeft: 2 }}>
+                  ≈ {fmtNum(efectivo)} por unidad{ventaNum > 0 && efectivo < ventaNum ? ' · con descuento por volumen' : ''}
+                </div>
+              )}
+            </div>
+          );
+        })}
         <div className="flex gap-2" style={{ marginTop: 4, flexWrap: 'wrap' }}>
           <button type="button" onClick={() => addPresentacion('Caja')} style={{ ...secondaryBtn, padding: '6px 10px', fontSize: 12 }}><Plus size={13} /> Caja</button>
           <button type="button" onClick={() => addPresentacion('Docena')} style={{ ...secondaryBtn, padding: '6px 10px', fontSize: 12 }}><Plus size={13} /> Docena</button>

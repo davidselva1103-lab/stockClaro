@@ -51,5 +51,5 @@ export function matchesSearch(p, q) {
 }
 export const MOTIVOS = {
   entrada: [['compra', 'Compra a proveedor'], ['devolucion', 'Devolución de cliente'], ['ajuste', 'Ajuste de inventario']],
-  salida: [['venta', 'Venta'], ['merma', 'Merma / daño'], ['ajuste', 'Ajuste de inventario']],
+  salida: [['venta', 'Venta'], ['venta_especial', 'Venta especial (precio manual)'], ['merma', 'Merma / daño'], ['ajuste', 'Ajuste de inventario']],
 };
