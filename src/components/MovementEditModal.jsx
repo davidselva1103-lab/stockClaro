@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { Check } from 'lucide-react';
-import { MOTIVOS, C } from '../lib/helpers.js';
+import { C, MOTIVOS } from '../lib/helpers.js';
 import { Modal, Field, inputStyle, primaryBtn, secondaryBtn } from '../ui.jsx';
+
+const MOTIVOS_EDIT = {
+  entrada: [...MOTIVOS.entrada, ['inicial', 'Inventario inicial']],
+  salida: MOTIVOS.salida,
+};
 
 export default function MovementEditModal({ movement, onClose, onSave }) {
   const [qty, setQty] = useState(String(movement.qty));
@@ -21,7 +26,7 @@ export default function MovementEditModal({ movement, onClose, onSave }) {
       <Field label="Cantidad"><input type="number" style={inputStyle} value={qty} onChange={e => setQty(e.target.value)} /></Field>
       <Field label="Motivo">
         <select style={inputStyle} value={motivo} onChange={e => setMotivo(e.target.value)}>
-          {MOTIVOS[movement.type].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {(MOTIVOS_EDIT[movement.type] || MOTIVOS_EDIT.salida).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </Field>
       <Field label="Nota"><input style={inputStyle} value={note} onChange={e => setNote(e.target.value)} /></Field>

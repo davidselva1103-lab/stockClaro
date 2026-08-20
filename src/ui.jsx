@@ -90,7 +90,7 @@ export function MovementRow({ m }) {
         </div>
         <div>
           <div style={{ fontSize: 13.5, fontWeight: 600 }}>{m.product_name}</div>
-          <div style={{ fontSize: 11.5, color: C.inkSoft }}>{fmtDate(m.date)} · {m.motivo}</div>
+          <div style={{ fontSize: 11.5, color: C.inkSoft }}>{fmtDate(m.date)} · {m.motivo}{m.presentacion ? ` · ${m.presentacion}` : ''}</div>
         </div>
       </div>
       <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 13, fontWeight: 700, color: isIn ? C.ok : C.danger }}>{isIn ? '+' : '-'}{fmtNum(m.qty)}</span>

@@ -51,6 +51,7 @@ create table if not exists products (
   stock numeric default 0,
   stock_minimo numeric default 5,
   unidad text default 'unidad',
+  presentaciones jsonb default '[]'::jsonb,
   created_at timestamptz default now()
 );
 
@@ -66,6 +67,9 @@ create table if not exists movements (
   costo_unit numeric,
   venta_unit numeric,
   note text,
+  presentacion text,
+  presentacion_unidades numeric,
+  presentacion_precio numeric,
   date timestamptz default now(),
   created_by uuid references auth.users(id)
 );

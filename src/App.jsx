@@ -100,20 +100,23 @@ export default function App() {
   const isAdmin = profile && profile.role === 'admin';
 
   // ---------- PRODUCT CRUD ----------
-  function openNewProduct() { setProductModal({ mode: 'new', data: { sku: '', nombre: '', descripcion: '', categoria: categories[0]?.name || 'General', costo: '', precio_venta: '', stock: '0', stock_minimo: '5', unidad: 'unidad' } }); }
-  function openEditProduct(p) { setProductModal({ mode: 'edit', data: { ...p, costo: String(p.costo), precio_venta: String(p.precio_venta), stock_minimo: String(p.stock_minimo) } }); }
+  function openNewProduct() { setProductModal({ mode: 'new', data: { sku: '', nombre: '', descripcion: '', categoria: categories[0]?.name || 'General', costo: '', precio_venta: '', stock: '0', stock_minimo: '5', unidad: 'unidad', presentaciones: [] } }); }
+  function openEditProduct(p) { setProductModal({ mode: 'edit', data: { ...p, costo: String(p.costo), precio_venta: String(p.precio_venta), stock_minimo: String(p.stock_minimo), presentaciones: (p.presentaciones || []).map(pr => ({ ...pr, cantidad: String(pr.cantidad), precio: String(pr.precio) })) } }); }
 
   async function saveProduct(data) {
     if (!data.nombre.trim()) { notify('El nombre es obligatorio', 'error'); return; }
     const costo = parseFloat(data.costo) || 0;
     const precio_venta = parseFloat(data.precio_venta) || 0;
     const stock_minimo = parseFloat(data.stock_minimo) || 0;
+    const presentaciones = (data.presentaciones || [])
+      .map(p => ({ id: p.id, nombre: (p.nombre || '').trim(), cantidad: parseFloat(p.cantidad) || 0, precio: parseFloat(p.precio) || 0 }))
+      .filter(p => p.nombre && p.cantidad > 0);
 
     if (productModal.mode === 'new') {
       const stockInicial = parseFloat(data.stock) || 0;
       const { data: inserted, error } = await supabase.from('products').insert({
         sku: data.sku.trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria,
-        costo, precio_venta, stock: stockInicial, stock_minimo, unidad: data.unidad,
+        costo, precio_venta, stock: stockInicial, stock_minimo, unidad: data.unidad, presentaciones,
       }).select().single();
       if (error) { notify('No se pudo guardar: ' + error.message, 'error'); return; }
       if (stockInicial > 0) {
@@ -126,7 +129,7 @@ export default function App() {
       notify('Producto agregado');
     } else {
       const { error } = await supabase.from('products').update({
-        sku: data.sku.trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria, costo, precio_venta, stock_minimo, unidad: data.unidad,
+        sku: data.sku.trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria, costo, precio_venta, stock_minimo, unidad: data.unidad, presentaciones,
       }).eq('id', data.id);
       if (error) { notify('No se pudo actualizar: ' + error.message, 'error'); return; }
       notify('Producto actualizado');
@@ -147,14 +150,17 @@ export default function App() {
     for (const it of items) {
       const p = products.find(x => x.id === it.productId);
       if (!p) continue;
-      const q = parseFloat(it.qty) || 0;
+      const q = parseFloat(it.baseQty) || 0;
       if (q <= 0) continue;
       const newStock = type === 'entrada' ? p.stock + q : Math.max(0, p.stock - q);
       const { error: e1 } = await supabase.from('products').update({ stock: newStock }).eq('id', it.productId);
       if (e1) { notify('No se pudo actualizar "' + p.nombre + '": ' + e1.message, 'error'); return false; }
+      const ventaUnitEfectivo = it.presentacion ? (it.presentacionPrecio / it.presentacionUnidades) : p.precio_venta;
       const { error: e2 } = await supabase.from('movements').insert({
         product_id: it.productId, sku: p.sku, product_name: p.nombre, type, motivo, qty: q,
-        costo_unit: p.costo, venta_unit: p.precio_venta, note: note || '', created_by: session.user.id,
+        costo_unit: p.costo, venta_unit: ventaUnitEfectivo, note: note || '', created_by: session.user.id,
+        presentacion: it.presentacion || null, presentacion_unidades: it.presentacion ? it.presentacionUnidades : null,
+        presentacion_precio: it.presentacion ? it.presentacionPrecio : null,
       });
       if (e2) { notify('No se pudo registrar el movimiento de "' + p.nombre + '": ' + e2.message, 'error'); return false; }
     }

@@ -60,6 +60,11 @@ export default function Productos({ products, categories, canEdit, money, onNew,
                     <td>
                       <div style={{ fontWeight: 600 }}>{p.nombre}</div>
                       {p.descripcion && <div style={{ fontSize: 11.5, color: C.inkSoft, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.descripcion}</div>}
+                      {p.presentaciones && p.presentaciones.length > 0 && (
+                        <div className="flex gap-2" style={{ marginTop: 3, flexWrap: 'wrap' }}>
+                          {p.presentaciones.map(pr => <Badge key={pr.id} color={C.brandDark} bg={C.brandSoft} style={{ fontSize: 10.5, padding: '1px 6px' }}>{pr.nombre}</Badge>)}
+                        </div>
+                      )}
                     </td>
                     <td><Badge color="#fff" bg={colorForCategory(p.categoria, categories)}>{p.categoria}</Badge></td>
                     <td>{money(p.costo)}</td>
