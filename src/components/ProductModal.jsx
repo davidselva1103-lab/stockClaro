@@ -74,24 +74,39 @@ export default function ProductModal({ state, categories, onClose, onSave, onAdd
 
       <Field label="Otras formas de venta (opcional)">
         <div style={{ fontSize: 12, color: '#5C6B67', marginBottom: 8 }}>Además de vender por unidad (precio de arriba), puedes agregar precios para vender por caja, docena, etc.</div>
+        {data.presentaciones.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 0.9fr auto auto', gap: 6, marginBottom: 4 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: '#5C6B67', textTransform: 'uppercase' }}>Nombre</span>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: '#5C6B67', textTransform: 'uppercase' }}>¿Cuántas unidades trae?</span>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: '#5C6B67', textTransform: 'uppercase' }}>Precio de venta</span>
+            <span></span><span></span>
+          </div>
+        )}
         {data.presentaciones.map(p => {
           const cant = parseFloat(p.cantidad) || 0;
           const precioNum = parseFloat(p.precio) || 0;
           const efectivo = cant > 0 && precioNum > 0 ? precioNum / cant : null;
+          const otras = data.presentaciones.filter(o => o.id !== p.id && (parseFloat(o.cantidad) || 0) > 0);
+          const comparacion = cant > 0 && otras.length > 0
+            ? otras.map(o => {
+                const oc = parseFloat(o.cantidad) || 0;
+                return `≈ ${fmtNum(cant / oc)} ${o.nombre || 'unidad'}${cant / oc !== 1 ? '(es)' : ''}`;
+              }).join(' · ')
+            : null;
           return (
-            <div key={p.id} style={{ marginBottom: 6 }}>
+            <div key={p.id} style={{ marginBottom: 8 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 0.9fr auto auto', gap: 6, alignItems: 'center' }}>
                 <input style={{ ...inputStyle, fontSize: 12.5 }} placeholder="Nombre (ej. Caja)" value={p.nombre} onChange={e => updatePresentacion(p.id, 'nombre', e.target.value)} />
-                <input type="number" style={{ ...inputStyle, fontSize: 12.5 }} placeholder="Unidades" value={p.cantidad} onChange={e => updatePresentacion(p.id, 'cantidad', e.target.value)} />
+                <input type="number" style={{ ...inputStyle, fontSize: 12.5 }} placeholder="Ej. 30" value={p.cantidad} onChange={e => updatePresentacion(p.id, 'cantidad', e.target.value)} />
                 <input type="number" step="0.01" style={{ ...inputStyle, fontSize: 12.5 }} placeholder="Precio (auto)" value={p.precio} onChange={e => updatePresentacion(p.id, 'precio', e.target.value)} />
                 <button type="button" title="Recalcular precio automático" onClick={() => recalcularPrecio(p.id)} style={{ ...iconBtn, border: '1px solid #DEE6E2' }}>↺</button>
                 <button type="button" onClick={() => removePresentacion(p.id)} style={{ ...iconBtn, color: '#C24141' }}><X size={14} /></button>
               </div>
-              {efectivo !== null && (
-                <div style={{ fontSize: 11, color: '#5C6B67', marginTop: 2, marginLeft: 2 }}>
-                  ≈ {fmtNum(efectivo)} por unidad{ventaNum > 0 && efectivo < ventaNum ? ' · con descuento por volumen' : ''}
-                </div>
-              )}
+              <div style={{ fontSize: 11, color: '#5C6B67', marginTop: 2, marginLeft: 2 }}>
+                {cant > 0 ? `1 ${p.nombre || 'presentación'} = ${fmtNum(cant)} unidades` : 'Escribe cuántas unidades trae'}
+                {efectivo !== null && <> · ≈ {fmtNum(efectivo)} por unidad{ventaNum > 0 && efectivo < ventaNum ? ' (con descuento)' : ''}</>}
+                {comparacion && <div>{comparacion}</div>}
+              </div>
             </div>
           );
         })}
