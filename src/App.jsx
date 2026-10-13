@@ -5,7 +5,7 @@ import {
   Settings as SettingsIcon, Loader2, ArrowDownCircle, ArrowUpCircle
 } from 'lucide-react';
 import { supabase } from './supabaseClient.js';
-import { C, CAT_PALETTE, fmtNum } from './lib/helpers.js';
+import { C, CAT_PALETTE, fmtNum, generateSku } from './lib/helpers.js';
 import { Toast, Modal, Field, inputStyle, primaryBtn, secondaryBtn } from './ui.jsx';
 import Login from './components/Login.jsx';
 import Dashboard from './components/Dashboard.jsx';
@@ -108,6 +108,7 @@ export default function App() {
     const costo = parseFloat(data.costo) || 0;
     const precio_venta = parseFloat(data.precio_venta) || 0;
     const stock_minimo = parseFloat(data.stock_minimo) || 0;
+    const skuFinal = (data.sku || '').trim() || generateSku(data.nombre, products);
     const presentaciones = (data.presentaciones || [])
       .map(p => ({ id: p.id, nombre: (p.nombre || '').trim(), cantidad: parseFloat(p.cantidad) || 0, precio: parseFloat(p.precio) || 0 }))
       .filter(p => p.nombre && p.cantidad > 0);
@@ -116,7 +117,7 @@ export default function App() {
       if (productModal.mode === 'new') {
         const stockInicial = parseFloat(data.stock) || 0;
         const { data: inserted, error } = await supabase.from('products').insert({
-          sku: (data.sku || '').trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria,
+          sku: skuFinal, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria,
           costo, precio_venta, stock: stockInicial, stock_minimo, unidad: data.unidad, presentaciones,
         }).select().single();
         if (error) { notify('No se pudo guardar: ' + error.message, 'error'); return 'Supabase respondió: ' + error.message; }
@@ -130,7 +131,7 @@ export default function App() {
         notify('Producto agregado');
       } else {
         const { error } = await supabase.from('products').update({
-          sku: (data.sku || '').trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria, costo, precio_venta, stock_minimo, unidad: data.unidad, presentaciones,
+          sku: skuFinal, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria, costo, precio_venta, stock_minimo, unidad: data.unidad, presentaciones,
         }).eq('id', data.id);
         if (error) { notify('No se pudo actualizar: ' + error.message, 'error'); return 'Supabase respondió: ' + error.message; }
         notify('Producto actualizado');
@@ -288,7 +289,7 @@ export default function App() {
           newCatsToInsert.push({ name: catName, color });
         }
         toInsertProducts.push({
-          sku: String(r.SKU || r.sku || '') || null, nombre, categoria: catName,
+          sku: String(r.SKU || r.sku || '').trim() || generateSku(nombre, [...products, ...toInsertProducts]), nombre, categoria: catName,
           costo: parseFloat(r.Costo || r.costo) || 0, precio_venta: parseFloat(r.PrecioVenta || r.precioVenta) || 0,
           stock: parseFloat(r.Stock || r.stock) || 0, stock_minimo: parseFloat(r.StockMinimo || r.stockMinimo) || 5,
           unidad: String(r.Unidad || r.unidad || 'unidad'),
@@ -301,6 +302,22 @@ export default function App() {
       setImportModal(false);
       fetchCategories(); fetchProducts();
     } catch (e) { notify('No se pudo leer el archivo. Usa la plantilla.', 'error'); }
+  }
+
+  async function backfillSkus() {
+    try {
+      const sin = products.filter(p => !(p.sku || '').trim());
+      if (!sin.length) { notify('Todos los productos ya tienen código'); return; }
+      let i = 0;
+      for (const p of sin) {
+        const sku = generateSku(p.nombre, products, i);
+        const { error } = await supabase.from('products').update({ sku }).eq('id', p.id);
+        if (error) { notify('No se pudo asignar código a "' + p.nombre + '": ' + error.message, 'error'); return; }
+        i++;
+      }
+      notify(i + ' producto' + (i !== 1 ? 's' : '') + ' con código nuevo');
+      fetchProducts();
+    } catch (e) { notify('No se pudo asignar códigos: ' + e.message, 'error'); }
   }
 
   async function signOut() { await supabase.auth.signOut(); }
@@ -351,7 +368,7 @@ export default function App() {
         {tab === 'reportes' && <Reportes products={products} movements={movements} money={money} />}
         {tab === 'config' && <Configuracion categories={categories} products={products} profile={profile} profiles={profiles} isAdmin={isAdmin} canEdit={canEdit} config={config}
           onAddCategory={addCategory} onDeleteCategory={deleteCategory} onChangeCurrency={changeCurrency} onChangeRole={changeRole}
-          onExport={exportExcel} onImportClick={() => setImportModal(true)} onTemplate={downloadTemplate} onSignOut={signOut} />}
+          onExport={exportExcel} onImportClick={() => setImportModal(true)} onTemplate={downloadTemplate} onBackfillSkus={backfillSkus} onSignOut={signOut} />}
       </div>
 
       {productModal && <ProductModal state={productModal} categories={categories} onClose={() => setProductModal(null)} onSave={saveProduct} onAddCategory={addCategory} />}

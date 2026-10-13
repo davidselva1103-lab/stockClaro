@@ -6,7 +6,7 @@ import { Badge, inputStyle, secondaryBtn, iconBtn } from '../ui.jsx';
 const ROLE_LABEL = { admin: 'Administrador', editor: 'Editor', viewer: 'Solo lectura' };
 
 export default function Configuracion({ categories, products, profile, profiles, isAdmin, canEdit, config,
-  onAddCategory, onDeleteCategory, onChangeCurrency, onChangeRole, onExport, onImportClick, onTemplate, onSignOut }) {
+  onAddCategory, onDeleteCategory, onChangeCurrency, onChangeRole, onExport, onImportClick, onTemplate, onBackfillSkus, onSignOut }) {
   const [newCat, setNewCat] = useState('');
   const [currency, setCurrency] = useState(config?.currency || 'C$');
 
@@ -49,6 +49,7 @@ export default function Configuracion({ categories, products, profile, profiles,
             <button onClick={onExport} style={secondaryBtn}><Download size={14} /> Exportar respaldo (.xlsx)</button>
             {canEdit && <button onClick={onImportClick} style={secondaryBtn}><Upload size={14} /> Importar productos</button>}
             <button onClick={onTemplate} style={secondaryBtn}><FileSpreadsheet size={14} /> Descargar plantilla</button>
+            {canEdit && <button onClick={onBackfillSkus} style={secondaryBtn}>Asignar código a productos sin SKU</button>}
           </div>
         </div>
 

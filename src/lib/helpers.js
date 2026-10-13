@@ -53,3 +53,15 @@ export const MOTIVOS = {
   entrada: [['compra', 'Compra a proveedor'], ['devolucion', 'Devolución de cliente'], ['ajuste', 'Ajuste de inventario']],
   salida: [['venta', 'Venta'], ['venta_especial', 'Venta especial (precio manual)'], ['merma', 'Merma / daño'], ['ajuste', 'Ajuste de inventario']],
 };
+
+// Genera un código (SKU) automático: 3 primeras letras del nombre + número consecutivo. Ej. TIR-0001
+export function generateSku(nombre, products, offset = 0) {
+  const letters = (nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 3);
+  const prefix = letters.length >= 2 ? letters : 'PRD';
+  let max = 0;
+  (products || []).forEach(p => {
+    const m = /^[A-Z]{2,4}-(\d{1,6})$/.exec((p.sku || '').trim());
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  });
+  return `${prefix}-${String(max + 1 + offset).padStart(4, '0')}`;
+}

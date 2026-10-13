@@ -76,7 +76,7 @@ export default function ProductModal({ state, categories, onClose, onSave, onAdd
         <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical', fontFamily: 'inherit' }} value={data.descripcion || ''} onChange={e => set('descripcion', e.target.value)} placeholder="Ej. Bolsa 100g, sabor fresa, empaque rojo" />
       </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <Field label="SKU / código"><input style={inputStyle} value={data.sku || ''} onChange={e => set('sku', e.target.value)} placeholder="Opcional (ej. TA-001)" /></Field>
+        <Field label="SKU / código"><input style={inputStyle} value={data.sku || ''} onChange={e => set('sku', e.target.value)} placeholder="Se genera solo si lo dejas vacío" /></Field>
         <Field label="Unidad">
           <select style={inputStyle} value={data.unidad} onChange={e => set('unidad', e.target.value)}>
             {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
