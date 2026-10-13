@@ -104,7 +104,7 @@ export default function App() {
   function openEditProduct(p) { setProductModal({ mode: 'edit', data: { ...p, costo: String(p.costo), precio_venta: String(p.precio_venta), stock_minimo: String(p.stock_minimo), presentaciones: (p.presentaciones || []).map(pr => ({ ...pr, cantidad: String(pr.cantidad), precio: String(pr.precio), precioAuto: false })) } }); }
 
   async function saveProduct(data) {
-    if (!data.nombre.trim()) { notify('El nombre es obligatorio', 'error'); return false; }
+    if (!data.nombre.trim()) { notify('El nombre es obligatorio', 'error'); return 'Ponle un nombre al producto.'; }
     const costo = parseFloat(data.costo) || 0;
     const precio_venta = parseFloat(data.precio_venta) || 0;
     const stock_minimo = parseFloat(data.stock_minimo) || 0;
@@ -116,10 +116,10 @@ export default function App() {
       if (productModal.mode === 'new') {
         const stockInicial = parseFloat(data.stock) || 0;
         const { data: inserted, error } = await supabase.from('products').insert({
-          sku: data.sku.trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria,
+          sku: (data.sku || '').trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria,
           costo, precio_venta, stock: stockInicial, stock_minimo, unidad: data.unidad, presentaciones,
         }).select().single();
-        if (error) { notify('No se pudo guardar: ' + error.message, 'error'); return false; }
+        if (error) { notify('No se pudo guardar: ' + error.message, 'error'); return 'Supabase respondió: ' + error.message; }
         if (stockInicial > 0) {
           await supabase.from('movements').insert({
             product_id: inserted.id, sku: inserted.sku, product_name: inserted.nombre, type: 'entrada',
@@ -130,17 +130,17 @@ export default function App() {
         notify('Producto agregado');
       } else {
         const { error } = await supabase.from('products').update({
-          sku: data.sku.trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria, costo, precio_venta, stock_minimo, unidad: data.unidad, presentaciones,
+          sku: (data.sku || '').trim() || null, nombre: data.nombre.trim(), descripcion: (data.descripcion || '').trim() || null, categoria: data.categoria, costo, precio_venta, stock_minimo, unidad: data.unidad, presentaciones,
         }).eq('id', data.id);
-        if (error) { notify('No se pudo actualizar: ' + error.message, 'error'); return false; }
+        if (error) { notify('No se pudo actualizar: ' + error.message, 'error'); return 'Supabase respondió: ' + error.message; }
         notify('Producto actualizado');
       }
       setProductModal(null);
       fetchProducts();
       return true;
     } catch (e) {
-      notify('No se pudo conectar con la base de datos: ' + e.message, 'error');
-      return false;
+      notify('No se pudo guardar: ' + e.message, 'error');
+      return 'Error al guardar: ' + e.message;
     }
   }
 

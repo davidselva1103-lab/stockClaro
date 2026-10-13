@@ -66,7 +66,7 @@ export default function ProductModal({ state, categories, onClose, onSave, onAdd
     setError(null);
     const ok = await onSave({ ...data, presentaciones });
     setSaving(false);
-    if (ok === false) setError('No se pudo guardar. Revisa tu conexión a internet e intenta de nuevo en unos segundos (si tu proyecto de Supabase estaba dormido, puede tardar un poco en despertar).');
+    if (ok !== true) setError(typeof ok === 'string' ? ok : 'No se pudo guardar. Revisa tu conexión a internet e intenta de nuevo.');
   }
 
   return (
@@ -76,7 +76,7 @@ export default function ProductModal({ state, categories, onClose, onSave, onAdd
         <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical', fontFamily: 'inherit' }} value={data.descripcion || ''} onChange={e => set('descripcion', e.target.value)} placeholder="Ej. Bolsa 100g, sabor fresa, empaque rojo" />
       </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <Field label="SKU / código"><input style={inputStyle} value={data.sku} onChange={e => set('sku', e.target.value)} placeholder="Autogenerado si se deja vacío" /></Field>
+        <Field label="SKU / código"><input style={inputStyle} value={data.sku || ''} onChange={e => set('sku', e.target.value)} placeholder="Opcional (ej. TA-001)" /></Field>
         <Field label="Unidad">
           <select style={inputStyle} value={data.unidad} onChange={e => set('unidad', e.target.value)}>
             {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
