@@ -12,6 +12,7 @@ export default function RegistrarMovimiento({ type, products, canEdit, userEmail
   const [note, setNote] = useState('');
   const [receipt, setReceipt] = useState(null);
   const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState(null);
   const isVentaEspecial = !isEntrada && motivo === 'venta_especial';
 
   // stock ya comprometido en el carrito para un producto (en unidades base), para no sobre-vender antes de confirmar
@@ -81,6 +82,7 @@ export default function RegistrarMovimiento({ type, products, canEdit, userEmail
   }, [cart]);
 
   async function confirm() {
+    setConfirmError(null);
     if (cart.length === 0) { notify('Agrega al menos un producto al carrito', 'error'); return; }
     if (!isEntrada) {
       for (const [productId, baseQty] of Object.entries(baseUnitsByProduct)) {
@@ -94,8 +96,17 @@ export default function RegistrarMovimiento({ type, products, canEdit, userEmail
       presentacion: i.presentacion, presentacionUnidades: i.presentacionUnidades, presentacionPrecio: i.unitPrice,
       ventaUnitEfectivo: i.unitPrice / i.presentacionUnidades,
     }));
-    const ok = await onConfirm({ items, type, motivo, note });
+    let ok;
+    try {
+      ok = await onConfirm({ items, type, motivo, note });
+    } catch (e) {
+      ok = false;
+      setConfirmError('No se pudo guardar la venta: ' + e.message + '. El carrito NO se vació — puedes intentar de nuevo.');
+    }
     setConfirming(false);
+    if (ok === false && !confirmError) {
+      setConfirmError('No se pudo guardar. Revisa tu conexión (si Supabase estaba pausado por inactividad, espera unos segundos e intenta de nuevo). El carrito sigue aquí, no se perdió nada.');
+    }
     if (ok !== false) {
       setReceipt({ items: cart, motivo, note, date: new Date(), total, type });
       setCart([]); setNote('');
@@ -222,6 +233,11 @@ export default function RegistrarMovimiento({ type, products, canEdit, userEmail
           </Field>
         )}
         <Field label="Nota (opcional)"><input style={inputStyle} value={note} onChange={e => setNote(e.target.value)} placeholder="Ej. Cliente, factura #234" /></Field>
+        {confirmError && (
+          <div className="flex items-start gap-2" style={{ background: C.dangerBg, color: C.danger, padding: '9px 11px', borderRadius: 9, fontSize: 12.5, marginBottom: 12 }}>
+            <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} /> <span>{confirmError}</span>
+          </div>
+        )}
         <button onClick={confirm} disabled={cart.length === 0 || confirming} style={{ ...primaryBtn, width: '100%', justifyContent: 'center', opacity: (cart.length === 0 || confirming) ? .5 : 1, background: isEntrada ? C.brand : C.danger }}>
           <Check size={15} /> {confirming ? 'Guardando…' : isEntrada ? 'Confirmar entrada' : 'Confirmar venta / salida'}
         </button>
